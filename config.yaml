@@ -1,0 +1,30 @@
+db:
+  type: duckdb
+  duckdb:
+    path: data/duckdb_questions.db
+    question_table: questions
+    hdv_table: hdvs
+  ### FOR PROD ###
+  # postgres:
+  #   dsn: postgres://user:pass@host:5432/yourdb
+  #   question_table: questions
+  #   hdv_table: hdvs
+  #################
+
+vector_index:
+  metric: METRIC_INNER_PRODUCT
+  top_k: 5
+
+encoder:
+  output_dim: 10000
+  emb_model: sbert
+  emb_model_name: all-MiniLM-L6-v2
+
+llm:
+  provider: gemini
+  model: gemini-2.0-flash
+  api_key_env: GEMINI_API_KEY
+
+server:
+  host: 0.0.0.0
+  port: 8000

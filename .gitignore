@@ -1,0 +1,9 @@
+.idea
+.python-version
+
+*.bin
+*.npy
+data/
+
+
+.DS_Store

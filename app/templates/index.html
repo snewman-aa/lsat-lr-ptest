@@ -1,0 +1,277 @@
+<!-- webapp/templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LSAT Practice</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <h1>Practice Tests</h1>
+      <section class="new-test">
+        <h2>New Test</h2>
+        <form id="prompt-form">
+          <label for="prompt-input">What type of questions?</label>
+            <textarea
+              id="prompt-input"
+              placeholder="e.g. weaken an argument on climate change"
+              required
+            ></textarea>
+            <button id="generate-btn" class="btn" type="submit">Generate</button>
+        </form>
+        <button id="clear-history-btn" class="btn">Clear History</button>
+      </section>
+      <section class="history">
+        <h2>Previous Tests</h2>
+        <ul id="history-list"></ul>
+      </section>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <div id="questions-container" class="questions-grid">
+        <!-- Filled dynamically with .question-card elements -->
+      </div>
+      <div id="submit-area" class="submit-area">
+        <button id="submit-test" class="btn" disabled>Submit Test</button>
+        <div id="score-display" class="score-display"></div>
+      </div>
+    </main>
+  </div>
+  <script>
+  let currentTestId = null;
+  let questions = [];
+
+  // Render questions (new or historical)
+  function renderQuestions(qs, completed = false) {
+    const container = document.getElementById('questions-container');
+    container.innerHTML = '';
+    qs.forEach((q, i) => {
+      const card = document.createElement('div');
+      card.className = 'question-card';
+      card.dataset.idx = i;
+
+      // Stimulus
+      if (q.stimulus) {
+        const bq = document.createElement('blockquote');
+        bq.innerText = q.stimulus;
+        card.appendChild(bq);
+      }
+      // Prompt
+      const p = document.createElement('p');
+      p.className = 'question-prompt';
+      p.innerHTML = `<strong>Q${q.question_number}.</strong> ${q.prompt}`;
+      card.appendChild(p);
+
+      // Answers
+      const form = document.createElement('form');
+      form.className = 'answers-form';
+
+      (q.answers || []).forEach(choice => {
+        const [label, ...rest] = choice.split('.');
+        const text = rest.join('.').trim();
+        const id = `q${i}-${label.trim()}`;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'choice';
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = `q${i}`;
+        input.id = id;
+        input.value = label.trim();
+        if (completed) {
+          input.disabled = true;
+          if (q.selected_answer === label.trim()) input.checked = true;
+        }
+        const lbl = document.createElement('label');
+        lbl.htmlFor = id;
+        lbl.innerText = `${label.trim()}. ${text}`;
+        wrapper.appendChild(input);
+        wrapper.appendChild(lbl);
+        form.appendChild(wrapper);
+      });
+
+      card.appendChild(form);
+
+      // Reveal area for answers & explanations
+      const reveal = document.createElement('div');
+      reveal.className = 'reveal-area';
+      card.appendChild(reveal);
+
+      container.appendChild(card);
+    });
+
+    // If loading a completed test, immediately reveal answers
+    if (completed) revealResults(qs);
+    else document.getElementById('submit-test').disabled = false;
+  }
+
+  // Clear history handler
+  document.getElementById('clear-history-btn').addEventListener('click', async () => {
+    if (!confirm("Delete all past tests and reset the count?")) return;
+    try {
+      const res = await fetch('/tests', { method: 'DELETE' });
+      if (!res.ok) throw new Error(res.statusText);
+      // Clear the sidebar list
+      document.getElementById('history-list').innerHTML = '';
+      alert("History cleared. Test IDs will reset starting at 1.");
+    } catch (err) {
+      console.error("Could not clear history:", err);
+      alert("Failed to clear history.");
+    }
+  });
+
+  // Show correct/incorrect styling & explanations
+  function revealResults(qs) {
+  let correctCount = 0;
+  qs.forEach((q, i) => {
+    const card     = document.querySelector(`.question-card[data-idx="${i}"]`);
+    const choices  = card.querySelectorAll('.choice');
+    const selected = q.selected_answer;
+
+    // disable all radios
+    card.querySelectorAll('input[type="radio"]').forEach(r => r.disabled = true);
+
+    choices.forEach(div => {
+      const val = div.querySelector('input').value;
+      // always mark the correct answer
+      if (val === q.correct_answer) {
+        div.classList.add('correct');
+      }
+      // mark the user's wrong pick in red
+      if (val === selected && val !== q.correct_answer) {
+        div.classList.add('incorrect');
+      }
+    });
+    if (selected === q.correct_answer) correctCount++;
+
+    // Show explanation
+    const reveal = card.querySelector('.reveal-area');
+    const ansP   = document.createElement('p');
+    ansP.className = 'correct-answer';
+    ansP.innerText = `Correct: ${q.correct_answer}.`;
+    reveal.appendChild(ansP);
+
+    if (q.explanation) {
+      const expP = document.createElement('p');
+      expP.className = 'explanation';
+      expP.innerText = q.explanation;
+      reveal.appendChild(expP);
+    }
+  });
+
+  document.getElementById('score-display').innerText =
+    `Your score: ${correctCount} / ${qs.length}`;
+  }
+
+  // Generate new test
+  document.getElementById('prompt-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const prompt  = document.getElementById('prompt-input').value.trim();
+    try {
+      const data = await postJSON('/generate', {prompt});
+      currentTestId = data.test_id;
+      questions     = data.similar_questions;
+      renderQuestions(questions, false);
+      prependHistory(data.test_id, prompt, "0/0");
+    } catch (err) {
+      console.error(err);
+      alert('Error generating test');
+    }
+  });
+
+  // Submit test
+  document.getElementById('submit-test').addEventListener('click', async () => {
+    // 1) Gather answers and write them into questions[]
+    questions.forEach((q, i) => {
+      const sel = document.querySelector(`input[name="q${i}"]:checked`);
+      q.selected_answer = sel ? sel.value : "";
+    });
+
+    // 2) Reveal results immediately (now wrongs will be marked red)
+    revealResults(questions);
+    document.getElementById('submit-test').disabled = true;
+
+    // 3) Persist to the server and update the sidebar button
+    const answersPayload = questions.map(q => ({
+      question_number: q.question_number,
+      selected_answer: q.selected_answer
+    }));
+    try {
+      await postJSON('/save_test', {
+        test_id: currentTestId,
+        answers: answersPayload
+      });
+      // update the sidebar label to show real score
+      const newScore = document
+        .getElementById('score-display')
+        .innerText.replace('Your score: ', '');
+      const btn = document.querySelector(`.history-btn[data-test-id="${currentTestId}"]`);
+      if (btn) {
+        // strip any existing “(x/y)” and append the new one:
+        const label = btn.innerText.replace(/\s*\(\d+\/\d+\)\s*$/, '');
+        btn.innerText = `${label} (${newScore})`;
+      }
+    } catch (err) {
+      console.error("Failed to save test:", err);
+    }
+  });
+
+  // Prepend history with button
+  function prependHistory(testId, prompt, score = "") {
+  const btn = document.createElement('button');
+  btn.className = 'history-btn';
+  btn.dataset.testId = testId;
+  btn.innerText = score
+    ? `${prompt} (${score})`
+    : prompt;
+  btn.addEventListener('click', () => loadHistory(testId));
+  const li = document.createElement('li');
+  li.appendChild(btn);
+  document.getElementById('history-list').prepend(li);
+}
+
+
+  // Load a previous test
+  async function loadHistory(testId) {
+    try {
+      const data = await fetch(`/tests/${testId}`).then(r=>r.json());
+      questions     = data.questions;
+      currentTestId = data.test_id;
+      renderQuestions(questions, true);
+    } catch (err) {
+      console.error(err);
+      alert('Could not load test');
+    }
+  }
+
+  // helper
+  async function postJSON(url, body) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(res.statusText);
+    return res.json();
+  }
+
+  // On page load, fetch and render history
+  document.addEventListener("DOMContentLoaded", async () => {
+    try {
+      const res = await fetch("/tests");
+      if (!res.ok) throw new Error(res.statusText);
+      const history = await res.json();
+      history.forEach(test => {
+        prependHistory(test.test_id, test.prompt, test.score);
+      });
+    } catch (err) {
+      console.error("Could not load history:", err);
+    }
+  });
+  </script>
+</body>
+</html>
