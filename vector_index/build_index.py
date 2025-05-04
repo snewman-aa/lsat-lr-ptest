@@ -8,13 +8,10 @@ from vector_index.index import build_faiss_index, save_index
 
 def main():
     project_root = Path(__file__).parent.parent
-    cfg = load_config(project_root / "config.yaml")
+    cfg = load_config()
 
-    # database configuration
-    db_type = cfg['db']['type']
-    db_conf = cfg['db'][db_type]
-    db_path = project_root / db_conf['path']
-    hdv_table = db_conf['hdv_table']
+    db_path = project_root / cfg.db.duckdb.path
+    hdv_table = cfg.db.duckdb.hdv_table
 
     loader = DuckDBLoader(db_path, table=hdv_table)
     hdv_array, ids = loader.load()

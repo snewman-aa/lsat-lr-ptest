@@ -9,19 +9,18 @@ from pydantic import BaseModel
 
 from config import load_config
 from encoder.encoder import Encoder
-from llm.query_llm import generate_sample_question
+from clients.gemini_client import GeminiClient
 from vector_index.index import query_index, load_index
 
-# ─── Configuration Loading ──────────────────────────────────────────
-cfg = load_config(Path(__file__).parent.parent / "config.yaml")
+
+cfg = load_config()
 project_root = Path(__file__).resolve().parent.parent
 
-db_type = cfg['db']['type']
-db_conf = cfg['db'][db_type]
-db_path = project_root / db_conf['path']
-question_table = db_conf['question_table']
-embed_model = cfg['encoder']['emb_model']
-model_name = cfg['encoder']['emb_model_name']
+db_type = cfg.db.type
+db_path = cfg.db.duckdb.path
+question_table = cfg.db.duckdb.question_table
+embed_model = cfg.encoder.emb_model
+model_name = cfg.encoder.emb_model_name
 
 # ─── Database Connection ──────────────────────────────────────────
 if not db_path.exists():
@@ -44,6 +43,9 @@ index = load_index(index_path)
 ids = np.load(ids_path).tolist()
 if index is None:
     raise ValueError("Failed to load the FAISS index.")
+
+# ─── Load the LLM Client ──────────────────────────────────────────
+gemini = GeminiClient()
 
 
 # ─── FastAPI App Setup ─────────────────────────────────────────────
@@ -105,18 +107,18 @@ async def generate(req: GenerateRequest):
     test_id = con_insert.execute("SELECT max(test_id) FROM tests;").fetchone()[0]
     con_insert.close()
 
-    sample = generate_sample_question(req.prompt)
+    sample = gemini.generate_sample_question(req.prompt)
 
     json_obj = {
         "question_number": None,
-        "stimulus": sample["stimulus"],
-        "prompt": sample["prompt"],
-        "explanation": sample["explanation"]
+        "stimulus": sample.stimulus,
+        "prompt": sample.prompt,
+        "explanation": sample.explanation
     }
     query_hdv = encoder.generate_question_hdv_from_json(json_obj, roles).astype("float32")
 
-    k = cfg['vector_index']['top_k']
-    metric = cfg['vector_index']['metric']
+    k = cfg.vector_index.top_k
+    metric = cfg.vector_index.metric
     inds, dists = query_index(index, query_hdv, k=k, metric=metric)
     similar_ids = [ids[i] for i in inds]
 
@@ -320,5 +322,4 @@ def healthz():
 
 if __name__ == '__main__':
     import uvicorn
-    server_cfg = cfg['server']
-    uvicorn.run(app, host=server_cfg['host'], port=server_cfg['port'])
+    uvicorn.run(app, host=cfg.server.host, port=cfg.server.port)

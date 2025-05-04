@@ -9,19 +9,17 @@ from encoder.encoder import Encoder
 
 
 def project_root() -> Path:
-    """Returns the project root (two levels up from this file)."""
     return Path(__file__).resolve().parent.parent
 
 
 def init_question_table():
-    """Create (or replace) the 'questions' table in DuckDB from your TSV."""
+    """Create (or replace) the 'questions' table in DuckDB from TSV"""
     cfg = load_config()
-    duckdb_cfg = cfg["db"]["duckdb"]
     root = project_root()
 
     tsv_path = root / "data" / "lsat_questions.tsv"
-    db_path  = root / duckdb_cfg["path"]
-    table    = duckdb_cfg["question_table"]
+    db_path  = root / cfg.db.duckdb.path
+    table    = cfg.db.duckdb.question_table
 
     if not tsv_path.exists():
         raise FileNotFoundError(f"Could not find TSV at {tsv_path}")
@@ -54,7 +52,7 @@ def init_question_table():
 
 
 def init_test_tables():
-    """Create the `tests` + `test_responses` tables with an auto-increment sequence."""
+    """Create the `tests` + `test_responses` tables with an auto-increment sequence"""
     cfg = load_config()
     duckdb_cfg = cfg["db"]["duckdb"]
     root = project_root()
@@ -91,7 +89,7 @@ def init_test_tables():
 def init_hdv_table():
     """
     Create (or refresh) the HDV store by projecting every question
-    into an HDV and inserting (question_number, hdv_blob).
+    into an HDV and inserting (question_number, hdv_blob)
     """
     cfg      = load_config()
     duckdb_cfg = cfg["db"]["duckdb"]

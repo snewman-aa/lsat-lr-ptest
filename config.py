@@ -1,14 +1,68 @@
 from pathlib import Path
-import yaml
+from typing import Literal
 
-def load_config(config_path: Path = None) -> dict:
-    """
-    Load YAML configuration from the project root.
+from pydantic import BaseModel
+from pydantic_settings_yaml import YamlBaseSettings
+from pydantic_settings import SettingsConfigDict
 
-    :param config_path: Optional path to config.yaml. Defaults to <project_root>/config.yaml.
-    :return: Parsed configuration dictionary.
+
+class DuckDBSettings(BaseModel):
+    path: Path
+    question_table: str
+    hdv_table: str
+
+
+class PostgresSettings(BaseModel):
+    dsn: str
+    question_table: str
+    hdv_table: str
+
+
+class DBSettings(BaseModel):
+    type: Literal["duckdb", "postgres"]
+    duckdb: DuckDBSettings
+    postgres: PostgresSettings | None = None
+
+
+class VectorIndexSettings(BaseModel):
+    metric: Literal["METRIC_INNER_PRODUCT", "METRIC_L2"]
+    top_k: int
+
+
+class EncoderSettings(BaseModel):
+    output_dim: int
+    emb_model: str
+    emb_model_name: str
+
+
+class LLMSettings(BaseModel):
+    model: str
+    api_key_env: str
+
+
+class ServerSettings(BaseModel):
+    host: str
+    port: int
+
+
+class Settings(YamlBaseSettings):
+    db: DBSettings
+    vector_index: VectorIndexSettings
+    encoder: EncoderSettings
+    llm: LLMSettings
+    server: ServerSettings
+
+    model_config = SettingsConfigDict(
+        yaml_file= Path("config.yaml"),
+        yaml_file_encoding="utf-8",
+        env_nested_delimiter="__",
+        case_sensitive=False,
+    )
+
+
+def load_config() -> Settings:
     """
-    if config_path is None:
-        config_path = Path(__file__).resolve().parent / "config.yaml"
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+    Load application settings from config.yaml, then overlay any
+    environment variables (e.g. DB__TYPE or LLM__PROVIDER).
+    """
+    return Settings()
