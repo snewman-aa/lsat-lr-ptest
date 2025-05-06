@@ -4,6 +4,7 @@ db:
     path: data/duckdb_questions.db
     question_table: questions
     hdv_table: hdvs
+    tsv_path: data/lsat_questions_deduped.tsv
   ### FOR PROD ###
   # postgres:
   #   dsn: postgres://user:pass@host:5432/yourdb

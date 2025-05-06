@@ -10,6 +10,7 @@ class DuckDBSettings(BaseModel):
     path: Path
     question_table: str
     hdv_table: str
+    tsv_path: Path
 
 
 class PostgresSettings(BaseModel):
