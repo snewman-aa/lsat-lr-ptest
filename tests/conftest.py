@@ -13,10 +13,10 @@ sys.path.insert(0, str(project_root))
 @pytest.fixture(scope="session", autouse=True)
 def setup_teardown_db():
     """
-    Session‐scoped: create (and later remove) data/duckdb_questions.db
+    Session‐scoped: create (and later remove) tests/data/duckdb_questions.db
     with exactly the tables the server expects.
     """
-    data_dir = project_root / "data"
+    data_dir = Path("tests/data")
     if data_dir.exists():
         shutil.rmtree(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -55,7 +55,6 @@ def setup_teardown_db():
         question_number INTEGER NOT NULL
       );
     """)
-
     con.execute("""
       CREATE TABLE test_responses (
         test_id          INTEGER NOT NULL,
@@ -63,7 +62,6 @@ def setup_teardown_db():
         selected_answer  TEXT    NOT NULL
       );
     """)
-
     con.close()
     yield
     shutil.rmtree(data_dir)
@@ -72,12 +70,15 @@ def setup_teardown_db():
 @pytest.fixture(autouse=True)
 def patch_server_deps(monkeypatch):
     """
-    Function‐scoped autouse: monkeypatch the names _in_ app.server that
-    do FAISS loading/querying and Gemini, then clear the DB cache.
+    Function‐scoped: redirect the app to use temp DB, stub FAISS & Gemini,
+    and—critically—clear any cached connection at teardown.
     """
     import app.server as srv
 
-    monkeypatch.setattr(srv, "load_index", lambda path: object())
+    test_db = Path("tests/data/duckdb_questions.db")
+    monkeypatch.setattr(srv, "db_path", test_db)
+
+    monkeypatch.setattr(srv, "load_index",  lambda path: object())
     monkeypatch.setattr(srv, "query_index", lambda idx, q, k, metric: ([0], [0.0]))
 
     from clients.gemini_client import SampleQuestion
@@ -87,7 +88,9 @@ def patch_server_deps(monkeypatch):
     monkeypatch.setattr(srv, "gemini", DummyGemini())
 
     yield
-    srv.get_db_connection.cache_clear()
+
+    if hasattr(srv.get_db_connection, "cache_clear"):
+        srv.get_db_connection.cache_clear()
 
 
 @pytest.fixture
