@@ -173,57 +173,46 @@ async def save_test(req: SaveTestRequest):
 
 @app.get("/tests/{test_id}")
 async def get_test(test_id: int):
+    """
+    Return a detailed test record: prompt, timestamp, each question
+    with its answers & user’s selection, and the overall score.
+    """
     con = get_db_connection()
 
-    test_row = con.execute(
+    row = con.execute(
         "SELECT prompt, created_at FROM tests WHERE test_id = ?;",
         (test_id,)
     ).fetchone()
-    if not test_row:
-        raise HTTPException(404, "Test not found")
-    prompt, created_at = test_row
+    if not row:
+        raise HTTPException(status_code=404, detail="Test not found")
+    prompt, created_at = row
 
-    rows = con.execute(f"""
+    sql = f"""
         SELECT
-          tq.question_number,
-          q.stimulus, q.prompt,
-          q.A, q.B, q.C, q.D, q.E,
-          q.correct_answer, q.explanation,
-          tr.selected_answer
-        FROM test_questions tq
-        JOIN {question_table} q
+            tq.question_number,
+            q.stimulus, q.prompt,
+            q.A, q.B, q.C, q.D, q.E,
+            q.correct_answer, q.explanation,
+            tr.selected_answer
+        FROM test_questions    AS tq
+        JOIN {question_table} AS q
           ON q.question_number = tq.question_number
-        LEFT JOIN test_responses tr
-          ON tr.test_id = tq.test_id
+        LEFT JOIN test_responses AS tr
+          ON tr.test_id         = tq.test_id
          AND tr.question_number = q.question_number
         WHERE tq.test_id = ?
         ORDER BY tq.rowid;
-    """, (test_id,)).fetchall()
+    """
+    rows = con.execute(sql, (test_id,)).fetchall()
 
-    if not rows:
-        rows = con.execute(f"""
-            SELECT
-              tr.question_number,
-              q.stimulus, q.prompt,
-              q.A, q.B, q.C, q.D, q.E,
-              q.correct_answer, q.explanation,
-              tr.selected_answer
-            FROM test_responses tr
-            JOIN {question_table} q
-              ON q.question_number = tr.question_number
-            WHERE tr.test_id = ?
-        """, (test_id,)).fetchall()
-
-
-    # response JSON
     questions = []
-    correct_count = 0
     for (
         qn, stim, pr,
         A, B, C, D, E,
         corr, expl,
         sel
     ) in rows:
+        selected = sel or ""
         questions.append({
             "question_number": qn,
             "stimulus": stim,
@@ -231,17 +220,22 @@ async def get_test(test_id: int):
             "answers": [A, B, C, D, E],
             "correct_answer": corr,
             "explanation": expl,
-            "selected_answer": sel or ""
+            "selected_answer": selected
         })
-        if sel == corr:
-            correct_count += 1
+
+    total = len(questions)
+    correct_cnt = sum(
+        1 for q in questions
+        if q["selected_answer"] == q["correct_answer"]
+    )
+    score_str = f"{correct_cnt}/{total}"
 
     return {
-        "test_id": test_id,
-        "prompt": prompt,
-        "created_at": str(created_at),
-        "questions": questions,
-        "score": f"{correct_count}/{len(questions)}"
+        "test_id":     test_id,
+        "prompt":      prompt,
+        "created_at":  str(created_at),
+        "questions":   questions,
+        "score":       score_str,
     }
 
 
