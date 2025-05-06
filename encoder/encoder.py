@@ -32,7 +32,8 @@ class Encoder:
     def generate_orthogonal_roles(self, num_roles=3):
         """
         Generate orthogonal role vectors using Gram–Schmidt via scipy.linalg.orth.
-        :param num_roles: Number of roles (e.g., 3 for 'stimulus', 'prompt', and 'explanation').
+        :param num_roles: Number of roles (e.g., 3 for 'stimulus', 'prompt', and 'explanation')
+        and 2 for 'stimulus' and 'prompt'.
         :return: Dictionary mapping field names to orthogonal role vectors.
         """
         random_matrix = np.random.randn(self.output_dim, num_roles)
@@ -41,8 +42,9 @@ class Encoder:
         roles = {
             "stimulus": ortho_matrix[:, 0],
             "prompt": ortho_matrix[:, 1],
-            "explanation": ortho_matrix[:, 2],
         }
+        if num_roles > 2:
+            roles["explanation"] = ortho_matrix[:, 2]
         return roles
 
     def get_sentence_embeddings(self, sentences: list) -> np.ndarray:
