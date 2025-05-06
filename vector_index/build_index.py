@@ -1,31 +1,44 @@
-import numpy as np
 from pathlib import Path
+import numpy as np
+from loguru import logger
 
-from config import load_config
 from db.duckdb_loader import DuckDBLoader
 from vector_index.index import build_faiss_index, save_index
 
 
-def main():
-    project_root = Path(__file__).parent.parent
-    cfg = load_config()
+def build_index(
+    db_path: Path,
+    hdv_table: str,
+    index_path: Path,
+    ids_path: Path,
+    metric: str = "METRIC_INNER_PRODUCT",
+) -> None:
+    """
+    Build a FAISS index from HDVs stored in DuckDB, and write out the
+    serialized index and the corresponding ID map.
 
-    db_path = project_root / cfg.db.duckdb.path
-    hdv_table = cfg.db.duckdb.hdv_table
-
+    Args:
+        db_path:       Path to DuckDB file
+        hdv_table:     Name of the table that holds (question_number, hdv_blob)
+        index_path:    File path where the FAISS index will be saved (.bin)
+        ids_path:      File path where the ID array will be saved (.npy)
+        metric:        Similarity metric; e.g. "METRIC_INNER_PRODUCT" or "METRIC_L2"
+    """
     loader = DuckDBLoader(db_path, table=hdv_table)
     hdv_array, ids = loader.load()
 
-    metric = cfg['vector_index']['metric']
     index = build_faiss_index(hdv_array, metric=metric)
 
-    out_dir = project_root / "vector_index"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    save_index(index, out_dir / "faiss_index.bin")
-    np.save(out_dir / "ids.npy", np.array(ids, dtype=np.int32))
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    ids_path.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"FAISS index and ID map written to: {out_dir}")
+    save_index(index, index_path)
+    np.save(ids_path, np.array(ids, dtype=np.int32), allow_pickle=False)
+
+    logger.info(f"FAISS index saved to: {index_path}")
+    logger.info(f"ID map saved to:    {ids_path}")
+
 
 
 if __name__ == "__main__":
-    main()
+    build_index()

@@ -2,103 +2,86 @@ import io
 from pathlib import Path
 import duckdb
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor
 
-from config import load_config
 from encoder.encoder import Encoder
 
 
-def project_root() -> Path:
-    return Path(__file__).resolve().parent.parent
-
-
-def init_question_table():
-    """Create (or replace) the 'questions' table in DuckDB from TSV"""
-    cfg = load_config()
-    root = project_root()
-
-    tsv_path = root / "data" / "lsat_questions.tsv"
-    db_path  = root / cfg.db.duckdb.path
-    table    = cfg.db.duckdb.question_table
-
+def init_question_table(tsv_path: Path, db_path: Path, question_table: str):
+    """(Re)create the 'questions' table in DuckDB from TSV."""
     if not tsv_path.exists():
         raise FileNotFoundError(f"Could not find TSV at {tsv_path}")
-
-    # ensure directory
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     con = duckdb.connect(database=str(db_path))
-    # drop + recreate from TSV
-    con.execute(f"DROP TABLE IF EXISTS {table};")
+    con.execute(f"DROP TABLE IF EXISTS {question_table};")
     con.execute(f"""
-        CREATE TABLE {table} AS
+        CREATE TABLE {question_table} AS
         SELECT
-          CAST(question_number AS INTEGER)       AS question_number,
-          stimulus,
-          prompt,
-          A, B, C, D, E,
-          correct_answer,
-          explanation
+          CAST(question_number AS INTEGER) AS question_number,
+          stimulus, prompt, A, B, C, D, E,
+          correct_answer, explanation
         FROM read_csv_auto(
           '{tsv_path.as_posix()}',
-          delim='\\t',
-          header=True,
-          auto_detect=True
+          delim='\\t', header=True, auto_detect=True
         );
     """)
-    con.execute(f"CREATE INDEX IF NOT EXISTS idx_qnum ON {table}(question_number);")
+    con.execute(f"CREATE INDEX IF NOT EXISTS idx_qnum ON {question_table}(question_number);")
     con.close()
-    print(f"'{table}' table initialized in {db_path}")
 
 
-def init_test_tables():
-    """Create the `tests` + `test_responses` tables with an auto-increment sequence"""
-    cfg = load_config()
-    duckdb_cfg = cfg["db"]["duckdb"]
-    root = project_root()
-
-    db_path = root / duckdb_cfg["path"]
-    con     = duckdb.connect(database=str(db_path))
-
+def init_test_tables(db_path: Path):
+    """Create the tests + test_questions + test_responses tables (with auto-increment)."""
+    con = duckdb.connect(database=str(db_path))
     con.execute("CREATE SEQUENCE IF NOT EXISTS test_id_seq START 1;")
-
     con.execute("""
         CREATE TABLE IF NOT EXISTS tests (
           test_id     INTEGER DEFAULT nextval('test_id_seq') PRIMARY KEY,
           prompt      TEXT NOT NULL,
-          created_at  TIMESTAMP DEFAULT current_timestamp
+          created_at  TIMESTAMP DEFAULT now()
         );
     """)
-
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS test_questions (
+          test_id         INTEGER NOT NULL,
+          question_number INTEGER NOT NULL
+        );
+    """)
     con.execute("""
         CREATE TABLE IF NOT EXISTS test_responses (
           test_id          INTEGER NOT NULL,
           question_number  INTEGER NOT NULL,
-          selected_answer  TEXT    NOT NULL,
+          selected_answer  TEXT NOT NULL,
           FOREIGN KEY(test_id) REFERENCES tests(test_id)
-        );
-        CREATE TABLE IF NOT EXISTS test_questions (
-        test_id         INTEGER NOT NULL,
-        question_number INTEGER NOT NULL
         );
     """)
     con.close()
-    print("'tests' and 'test_responses' tables initialized")
 
 
-def init_hdv_table():
+def init_hdv_table(
+    db_path: Path,
+    question_table: str,
+    hdv_table: str,
+    encoder: Encoder | None,
+    output_dim: int,
+    emb_model: str,
+) -> None:
     """
-    Create (or refresh) the HDV store by projecting every question
-    into an HDV and inserting (question_number, hdv_blob)
+    Create or refresh the HDV store by projecting every question
+    into an HDV and inserting (question_number, hdv_blob).
+    This version runs entirely in the main thread to avoid native‐library
+    threading issues.
+    :param db_path: Path to the DuckDB file.
+    :param question_table: Name of the questions table.
+    :param hdv_table: Name of the table to store HDV blobs.
+    :param encoder: Optional pre-initialized Encoder; if None, one will be created.
+    :param output_dim: HDV dimensionality.
+    :param emb_model: Embedding model name for the Encoder.
+    :param n_workers: Ignored (retained for signature compatibility).
     """
-    cfg      = load_config()
-    duckdb_cfg = cfg["db"]["duckdb"]
-    enc_cfg  = cfg["encoder"]
-    root     = project_root()
+    if encoder is None:
+        encoder = Encoder(output_dim=output_dim, emb_model=emb_model)
 
-    db_path        = root / duckdb_cfg["path"]
-    question_table = duckdb_cfg["question_table"]
-    hdv_table      = duckdb_cfg["hdv_table"]
+    roles = encoder.generate_orthogonal_roles(num_roles=3)
 
     con = duckdb.connect(database=str(db_path))
     con.execute(f"DROP TABLE IF EXISTS {hdv_table};")
@@ -114,45 +97,22 @@ def init_hdv_table():
         FROM {question_table};
     """).fetchall()
 
-    questions = [
-        {
+    for qn, stim, pr, expl in rows:
+        qobj = {
             "question_number": qn,
-            "stimulus":       stim,
-            "prompt":         pr,
-            "explanation":    expl or ""
+            "stimulus":        stim or "",
+            "prompt":          pr   or "",
+            "explanation":     expl or "",
         }
-        for qn, stim, pr, expl in rows
-    ]
+        hdv = encoder.generate_question_hdv_from_json(qobj, roles)
 
-    encoder = Encoder(output_dim=enc_cfg["output_dim"],
-                      emb_model=enc_cfg["emb_model"])
-    roles   = encoder.generate_orthogonal_roles(num_roles=3)
-
-    def worker(qobj):
-        qnum = qobj["question_number"]
-        hdv  = encoder.generate_question_hdv_from_json(qobj, roles)
-        return qnum, hdv
-
-    max_workers = cfg.get("parallel", {}).get("n_workers", None)
-    hdv_map = {}
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        for qnum, hdv in pool.map(worker, questions):
-            hdv_map[qnum] = hdv
-
-    for qnum, hdv in hdv_map.items():
         buf = io.BytesIO()
         np.save(buf, hdv.astype("float32"), allow_pickle=False)
         blob = buf.getvalue()
         con.execute(
             f"INSERT INTO {hdv_table} (question_number, hdv_blob) VALUES (?, ?);",
-            (int(qnum), blob)
+            (int(qn), blob)
         )
 
     con.close()
-    print(f"'{hdv_table}' table initialized with {len(hdv_map)} HDVs")
-
-
-if __name__ == "__main__":
-    init_question_table()
-    init_test_tables()
-    init_hdv_table()
+    print(f"Initialized '{hdv_table}' with {len(rows)} HDVs.")
