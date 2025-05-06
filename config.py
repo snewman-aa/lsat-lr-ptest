@@ -53,10 +53,11 @@ class Settings(YamlBaseSettings):
     server: ServerSettings
 
     model_config = SettingsConfigDict(
-        yaml_file= Path("config.yaml"),
+        yaml_file = Path(__file__).resolve().parent / "config.yaml",
         yaml_file_encoding="utf-8",
         env_nested_delimiter="__",
         case_sensitive=False,
+        env_prefix="",
     )
 
 
