@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from pydantic import BaseModel
+from functools import lru_cache
 
 from config import load_config
 from encoder.encoder import Encoder
@@ -23,9 +24,15 @@ embed_model = cfg.encoder.emb_model
 model_name = cfg.encoder.emb_model_name
 
 # ─── Database Connection ──────────────────────────────────────────
-if not db_path.exists():
-    raise FileNotFoundError(f"DuckDB file not found at {db_path}")
-con = duckdb.connect(database=str(db_path))
+@lru_cache()
+def get_db_connection():
+    """
+    Lazily open & cache a DuckDB connection the first time
+    any endpoint needs it.  Raises if the file is missing.
+    """
+    if not db_path.exists():
+        raise FileNotFoundError(f"DuckDB file not found at {db_path}")
+    return duckdb.connect(database=str(db_path))
 
 # ─── Load the Encoder ─────────────────────────────────────────────
 # init encoder with defaults (10k and sbert)
@@ -46,7 +53,6 @@ if index is None:
 
 # ─── Load the LLM Client ──────────────────────────────────────────
 gemini = GeminiClient()
-
 
 # ─── FastAPI App Setup ─────────────────────────────────────────────
 app = FastAPI()
@@ -99,13 +105,12 @@ async def generate(req: GenerateRequest):
     Create HDV for the generated question
     Vector search for similar questions
     """
-    con_insert = duckdb.connect(database=str(db_path))
+    con_insert = get_db_connection()
     con_insert.execute(
         "INSERT INTO tests (prompt) VALUES (?);",
         (req.prompt,)
         )
     test_id = con_insert.execute("SELECT max(test_id) FROM tests;").fetchone()[0]
-    con_insert.close()
 
     sample = gemini.generate_sample_question(req.prompt)
 
@@ -122,16 +127,15 @@ async def generate(req: GenerateRequest):
     inds, dists = query_index(index, query_hdv, k=k, metric=metric)
     similar_ids = [ids[i] for i in inds]
 
-    con_q = duckdb.connect(database=str(db_path))
+    con_q = get_db_connection()
     for qid in similar_ids:
         con_q.execute(
             "INSERT INTO test_questions(test_id, question_number) VALUES (?, ?);",
             (test_id, qid)
             )
-    con_q.close()
 
     results = []
-    con_read = duckdb.connect(database=str(db_path))
+    con_read = get_db_connection()
     for qid in similar_ids:
         row = con_read.execute(f"""
             SELECT question_number, stimulus, prompt, A, B, C, D, E, correct_answer, explanation
@@ -147,7 +151,6 @@ async def generate(req: GenerateRequest):
                 "correct_answer": row[8],
                 "explanation": row[9],
             })
-    con_read.close()
 
     return {
         "test_id": test_id,
@@ -159,26 +162,24 @@ async def generate(req: GenerateRequest):
 
 @app.post("/save_test")
 async def save_test(req: SaveTestRequest):
-    con = duckdb.connect(database=str(db_path))
+    con = get_db_connection()
     for ans in req.answers:
         con.execute(
             "INSERT INTO test_responses (test_id, question_number, selected_answer) VALUES (?, ?, ?);",
             (req.test_id, ans.question_number, ans.selected_answer)
         )
-    con.close()
     return {"status": "ok", "test_id": req.test_id}
 
 
 @app.get("/tests/{test_id}")
 async def get_test(test_id: int):
-    con = duckdb.connect(database=str(db_path))
+    con = get_db_connection()
 
     test_row = con.execute(
         "SELECT prompt, created_at FROM tests WHERE test_id = ?;",
         (test_id,)
     ).fetchone()
     if not test_row:
-        con.close()
         raise HTTPException(404, "Test not found")
     prompt, created_at = test_row
 
@@ -213,7 +214,6 @@ async def get_test(test_id: int):
             WHERE tr.test_id = ?
         """, (test_id,)).fetchall()
 
-    con.close()
 
     # response JSON
     questions = []
@@ -250,7 +250,7 @@ async def list_tests():
     """
     Return a list of past tests, each with prompt, timestamp, and score
     """
-    con = duckdb.connect(database=str(db_path))
+    con = get_db_connection()
     rows = con.execute(f"""
         SELECT
           t.test_id,
@@ -267,7 +267,6 @@ async def list_tests():
         GROUP BY t.test_id, t.prompt, t.created_at
         ORDER BY t.created_at DESC;
     """).fetchall()
-    con.close()
 
     summaries = []
     for test_id, prompt, created_at, correct, total in rows:
@@ -285,7 +284,7 @@ async def list_tests():
 async def list_questions(limit: int = 10, offset: int = 0):
     if not db_path.exists():
         raise HTTPException(500, f"DB not found at {db_path}")
-    con = duckdb.connect(database=str(db_path))
+    con = get_db_connection()
     try:
         sql = f"""
             SELECT question_number, prompt
@@ -306,13 +305,12 @@ async def clear_tests():
     Delete all tests, test_questions, and test_responses,
     then restart the sequence at 1.
     """
-    con = duckdb.connect(database=str(db_path))
+    con = get_db_connection()
     con.execute("DELETE FROM test_responses;")
     con.execute("DELETE FROM test_questions;")
     con.execute("DELETE FROM tests;")
     con.execute("DROP SEQUENCE IF EXISTS test_id_seq;")
     con.execute("CREATE SEQUENCE test_id_seq START 1;")
-    con.close()
     return {"status": "ok"}
 
 
