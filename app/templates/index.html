@@ -104,7 +104,7 @@
       container.appendChild(card);
     });
 
-    // If loading a completed test, immediately reveal answers
+    // if loading a completed test, immediately reveal answers
     if (completed) revealResults(qs);
     else document.getElementById('submit-test').disabled = false;
   }
@@ -185,17 +185,17 @@
 
   // Submit test
   document.getElementById('submit-test').addEventListener('click', async () => {
-    // 1) Gather answers and write them into questions[]
+    // gather answers and write to questions[]
     questions.forEach((q, i) => {
       const sel = document.querySelector(`input[name="q${i}"]:checked`);
       q.selected_answer = sel ? sel.value : "";
     });
 
-    // 2) Reveal results immediately (now wrongs will be marked red)
+    // reveal results immediately with red/green
     revealResults(questions);
     document.getElementById('submit-test').disabled = true;
 
-    // 3) Persist to the server and update the sidebar button
+    // persist to the server and update the sidebar button
     const answersPayload = questions.map(q => ({
       question_number: q.question_number,
       selected_answer: q.selected_answer
@@ -220,7 +220,7 @@
     }
   });
 
-  // Prepend history with button
+  // prepend history with button
   function prependHistory(testId, prompt, score = "") {
   const btn = document.createElement('button');
   btn.className = 'history-btn';
@@ -235,7 +235,7 @@
 }
 
 
-  // Load a previous test
+  // load a previous test
   async function loadHistory(testId) {
     try {
       const data = await fetch(`/tests/${testId}`).then(r=>r.json());
@@ -259,7 +259,7 @@
     return res.json();
   }
 
-  // On page load, fetch and render history
+  // on page load, fetch and render history
   document.addEventListener("DOMContentLoaded", async () => {
     try {
       const res = await fetch("/tests");
