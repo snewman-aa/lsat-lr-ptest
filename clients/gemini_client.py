@@ -5,15 +5,7 @@ from google.genai import types
 from loguru import logger
 
 from config import load_config
-
-
-class SampleQuestion(BaseModel):
-    stimulus:       str
-    prompt:         str
-    explanation:    str
-
-    class Config:
-        validate_by_name = True
+from app.models import SampleQuestion
 
 
 class GeminiClient:

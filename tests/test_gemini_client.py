@@ -1,6 +1,6 @@
 import pytest
-
-from clients.gemini_client import GeminiClient, SampleQuestion
+from app.models import SampleQuestion
+from clients import GeminiClient
 
 
 class DummyResponse:

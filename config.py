@@ -28,6 +28,8 @@ class DBSettings(BaseModel):
 class VectorIndexSettings(BaseModel):
     metric: Literal["METRIC_INNER_PRODUCT", "METRIC_L2"]
     top_k: int
+    index_path: Path
+    ids_path: Path
 
 
 class EncoderSettings(BaseModel):

@@ -1,5 +1,5 @@
 import numpy as np
-from encoder.encoder import Encoder
+from encoder import Encoder
 
 
 def test_simhash_simple():

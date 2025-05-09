@@ -3,7 +3,7 @@ from pathlib import Path
 from loguru import logger
 
 from config import load_config
-from db.models import init_question_table, init_test_tables, init_hdv_table
+from db.schema import init_question_table, init_test_tables, init_hdv_table
 from vector_index.build_index import build_index
 
 
