@@ -7,3 +7,6 @@ data/
 
 
 .DS_Store
+
+# setuptools
+*.egg-info
