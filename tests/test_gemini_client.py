@@ -1,6 +1,6 @@
 import pytest
-from app.models import SampleQuestion
-from clients import GeminiClient
+from lsat_lr_ptest.app.models import SampleQuestion
+from lsat_lr_ptest.clients import GeminiClient
 
 
 class DummyResponse:

@@ -1,5 +1,5 @@
 import numpy as np
-from vector_index.index import build_faiss_index, query_index
+from lsat_lr_ptest.vector_index.index import build_faiss_index, query_index
 
 
 def test_faiss_build_and_query():

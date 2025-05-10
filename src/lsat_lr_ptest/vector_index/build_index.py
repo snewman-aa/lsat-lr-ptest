@@ -2,8 +2,8 @@ from pathlib import Path
 import numpy as np
 from loguru import logger
 
-from db.duckdb_loader import DuckDBLoader
-from vector_index.index import build_faiss_index, save_index
+from lsat_lr_ptest.db.duckdb_loader import DuckDBLoader
+from lsat_lr_ptest.vector_index.index import build_faiss_index, save_index
 
 
 def build_index(

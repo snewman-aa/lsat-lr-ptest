@@ -6,6 +6,9 @@ from pydantic_settings_yaml import YamlBaseSettings
 from pydantic_settings import SettingsConfigDict
 
 
+PROJECT_ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+
+
 class DuckDBSettings(BaseModel):
     path: Path
     question_table: str
@@ -56,7 +59,7 @@ class Settings(YamlBaseSettings):
     server: ServerSettings
 
     model_config = SettingsConfigDict(
-        yaml_file = Path(__file__).resolve().parent / "config.yaml",
+        yaml_file =PROJECT_ROOT_DIR / "config.yaml",
         yaml_file_encoding="utf-8",
         env_nested_delimiter="__",
         case_sensitive=False,

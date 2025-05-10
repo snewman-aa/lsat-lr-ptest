@@ -9,7 +9,7 @@ from functools import lru_cache
 from datetime import datetime
 from loguru import logger
 
-from app.models import (
+from .models import (
     GenerateRequest,
     AnswerItem,
     SaveTestRequest,
@@ -27,10 +27,10 @@ from app.models import (
     QuestionListItem
 )
 
-from config import load_config, Settings
-from encoder import Encoder
-from clients import GeminiClient
-from vector_index.index import query_index, load_index
+from lsat_lr_ptest.config import load_config, Settings
+from lsat_lr_ptest.encoder import Encoder
+from ..clients import GeminiClient
+from lsat_lr_ptest.vector_index.index import query_index, load_index
 
 # --- Global Configuration and Setup ---
 cfg: Settings = load_config()

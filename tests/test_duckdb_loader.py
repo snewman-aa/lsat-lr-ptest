@@ -1,7 +1,7 @@
 import io
 import numpy as np
 import duckdb
-from db.duckdb_loader import DuckDBLoader
+from lsat_lr_ptest.db.duckdb_loader import DuckDBLoader
 
 
 def test_loader_roundtrip(tmp_path):

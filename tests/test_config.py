@@ -1,6 +1,6 @@
 import os
 
-from config import load_config
+from lsat_lr_ptest.config import load_config
 
 
 def test_loads_all_sections():

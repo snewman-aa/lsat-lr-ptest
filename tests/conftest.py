@@ -9,8 +9,8 @@ from fastapi.testclient import TestClient
 project_root = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(project_root))
 
-import app.server as srv
-from app.models import SampleQuestion
+import lsat_lr_ptest.app.server as srv
+from lsat_lr_ptest.app.models import SampleQuestion
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -121,5 +121,5 @@ def client(monkeypatch):
     Patch numpy.load (for the ids array loaded in server.py),
     then import and return TestClient(app).
     """
-    from app.server import app
+    from lsat_lr_ptest.app.server import app
     return TestClient(app)

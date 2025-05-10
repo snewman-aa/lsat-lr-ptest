@@ -3,7 +3,7 @@ from pathlib import Path
 import duckdb
 import numpy as np
 
-from encoder import Encoder
+from lsat_lr_ptest.encoder import Encoder
 from loguru import logger
 
 

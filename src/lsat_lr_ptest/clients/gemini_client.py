@@ -1,11 +1,11 @@
 import os
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 from google import genai
 from google.genai import types
 from loguru import logger
 
-from config import load_config
-from app.models import SampleQuestion
+from lsat_lr_ptest.config import load_config
+from lsat_lr_ptest.app.models import SampleQuestion
 
 
 class GeminiClient:

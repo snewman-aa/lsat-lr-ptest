@@ -1,5 +1,5 @@
 import numpy as np
-from encoder import Encoder
+from lsat_lr_ptest.encoder import Encoder
 
 
 def test_simhash_simple():
