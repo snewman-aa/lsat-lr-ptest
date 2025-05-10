@@ -2,9 +2,9 @@ import sys
 from pathlib import Path
 from loguru import logger
 
-from config import load_config
-from db.schema import init_question_table, init_test_tables, init_hdv_table
-from vector_index.build_index import build_index
+from lsat_lr_ptest.config import load_config
+from lsat_lr_ptest.db.schema import init_question_table, init_test_tables, init_hdv_table
+from lsat_lr_ptest.vector_index.build_index import build_index
 
 
 def main():
