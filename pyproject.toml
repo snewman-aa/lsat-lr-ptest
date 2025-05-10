@@ -1,7 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "lsat-lr-ptest"
 version = "0.1.0"
-description = "Add your description here"
+description = "VSA retrieval system for Logical Reasoning LSAT practice tests with a FastAPI + Jinja webapp"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Sam Newman", email = "snewman.aa@gmail.com" },
+]
 requires-python = ">=3.12"
 dependencies = [
     "bs4>=0.0.2",
