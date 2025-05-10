@@ -91,11 +91,11 @@ export GEMINI_API_KEY="your-key-here"
 Before running the app, initialize the database tables, project all HDVs, and build the FAISS index:
 
 ```bash
-python setup.py
+python init_project.py
 ```
 of if using uv:
 ```bash
-uv run setup.py
+uv run init_project.py
 ```
 
 You should see a four‐step progress:
