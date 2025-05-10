@@ -7,7 +7,6 @@ name = "lsat-lr-ptest"
 version = "0.1.0"
 description = "VSA retrieval system for Logical Reasoning LSAT practice tests with a FastAPI + Jinja webapp"
 readme = "README.md"
-license = { file = "LICENSE" }
 authors = [
     { name = "Sam Newman", email = "snewman.aa@gmail.com" },
 ]
