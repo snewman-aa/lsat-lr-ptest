@@ -1,7 +1,7 @@
 from pathlib import Path
 from .index import build_faiss_index, query_index
 
-from db.duckdb_loader import DuckDBLoader
+from lsat_lr_ptest.db.duckdb_loader import DuckDBLoader
 # from db.postgres_loader import PostgresLoader
 
 
