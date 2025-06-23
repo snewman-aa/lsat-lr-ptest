@@ -19,19 +19,18 @@ def main():
     index_path = root / "vector_index" / "faiss_index.bin"
     ids_path = root / "vector_index" / "ids.npy"
 
-    # 1) ensure data/ is there
+    # ensure data/ is present in the project root
     if not data_dir.exists():
         logger.info(f"Creating data directory at {data_dir}")
         data_dir.mkdir(parents=True, exist_ok=True)
 
-    # 2) check for TSV
+    # check for the scraped questions TSV from the lsat_scraping notebook
     if not tsv_path.exists():
         logger.error(f"Could not find your LSAT TSV at {tsv_path}"
                      f"\nPlease place provided lsat_questions_deduped.tsv"
                      f" into the data/ folder")
         sys.exit(1)
 
-    # 3) DuckDB tables
     logger.info("[1/4] Initializing questions table…")
     init_question_table(tsv_path, db_path, db_cfg.question_table)
 
@@ -48,7 +47,6 @@ def main():
         emb_model=enc_cfg.emb_model,
     )
 
-    # 4) FAISS index
     logger.info("[4/4] Building FAISS index…")
     build_index(
         db_path=db_path,
