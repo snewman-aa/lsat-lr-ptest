@@ -2,7 +2,7 @@
 An interactive web application for generating and practicing LSAT-style logic questions using a
 Retriever–Augmented Generation (RAG) approach with VSA Holographic Reduced Representation indexing.
 
-## 📦 Installation
+## Installation
 
 ### 1. Clone the repository
 ```bash
@@ -31,7 +31,7 @@ uv pip install -e .
 ```
 This will install required libraries (FastAPI, DuckDB, FAISS, Sentence-Transformers, etc.)
 
-## 🗂 Data Preparation
+## Data Preparation
 
 ### 1. Create a top-level `data/` folder if it doesn’t already exist:
 
@@ -50,7 +50,7 @@ data/lsat_questions_deduped.tsv
     question_number\tstimulus\tprompt\tA\tB\tC\tD\tE\tcorrect_answer\texplanation\n
     ```
 
-## ⚙️ Configuration
+## Configuration
 All runtime settings live in `config.yaml` at the project root:
 
 ```yaml
@@ -87,7 +87,7 @@ server:
 export GEMINI_API_KEY="your-key-here"
 ```
 
-## 🚀 Setup
+## Setup
 Before running the app, initialize the database tables, project all HDVs, and build the FAISS index:
 
 ```bash
@@ -110,7 +110,7 @@ You should see a four‐step progress:
 
 If the TSV is missing, `setup.py` will bail out with a clear error.
 
-## 🏃‍♂️ Running the App
+## Running the App
 There are two ways to start the server:
 
 ### 1. Via the provided runner
@@ -135,7 +135,7 @@ http://localhost:8000
 ```
 and you’ll see the practice‐test UI.
 
-## 🛠️ Project Layout
+## Project Layout
 ```
 .
 ├── app/                 # FastAPI application (templates, static, server code)
@@ -155,7 +155,7 @@ and you’ll see the practice‐test UI.
 └── tests/               # Pytest suite
 ```
 
-## 🎯 Next Steps
+## Next Steps
 
 ### HDVs
 * Experiment with contextual embeddings of higher dimensions
